@@ -64,7 +64,11 @@ function createRectFrustumGeometry(
 /**
  * Authentic Dravidian Sala-Shikhara barrel-vaulted roof profile extruded along X.
  */
-function createSalaRoofGeometry(lengthX: number, depthZ: number, heightY: number): THREE.BufferGeometry {
+function createSalaRoofGeometry(
+  lengthX: number,
+  depthZ: number,
+  heightY: number
+): { geometry: THREE.BufferGeometry; bevelSize: number; bevelThickness: number } {
   const hd = depthZ / 2;
   const shape = new THREE.Shape();
 
@@ -93,11 +97,14 @@ function createSalaRoofGeometry(lengthX: number, depthZ: number, heightY: number
   shape.lineTo(hd * 1.08, 0);
   shape.closePath();
 
+  const bevelThickness = Math.min(lengthX, depthZ) * 0.04;
+  const bevelSize = Math.min(lengthX, depthZ) * 0.03;
+
   const geo = new THREE.ExtrudeGeometry(shape, {
     depth: lengthX,
     bevelEnabled: true,
-    bevelThickness: Math.min(lengthX, depthZ) * 0.04,
-    bevelSize: Math.min(lengthX, depthZ) * 0.03,
+    bevelThickness,
+    bevelSize,
     bevelSegments: 2,
     curveSegments: 14,
   });
@@ -106,7 +113,7 @@ function createSalaRoofGeometry(lengthX: number, depthZ: number, heightY: number
   geo.translate(0, 0, -lengthX / 2);
   geo.rotateY(Math.PI / 2);
   geo.computeVertexNormals();
-  return geo;
+  return { geometry: geo, bevelSize, bevelThickness };
 }
 
 /**
@@ -135,12 +142,15 @@ function createKuduArchGeometry(width: number, height: number, depth: number): T
 }
 
 /**
- * Lathe-turned sacred Kalasam finial geometry (base at y = 0).
+ * Lathe-turned sacred Kalasam finial geometry with an embedded root collar (y = -0.02..0)
+ * so every finial links cleanly into its ridge or dome pedestal without floating.
  */
 function createKalasamGeometry(height: number, radius: number): THREE.BufferGeometry {
+  const rootDepth = Math.max(0.015, height * 0.12);
   const pts = [
-    new THREE.Vector2(0.001, 0),
-    new THREE.Vector2(radius * 1.05, 0),
+    new THREE.Vector2(0.001, -rootDepth),
+    new THREE.Vector2(radius * 1.12, -rootDepth),
+    new THREE.Vector2(radius * 1.12, 0),
     new THREE.Vector2(radius * 1.05, height * 0.12),
     new THREE.Vector2(radius * 0.72, height * 0.22),
     new THREE.Vector2(radius * 0.96, height * 0.38),
@@ -151,7 +161,7 @@ function createKalasamGeometry(height: number, radius: number): THREE.BufferGeom
     new THREE.Vector2(radius * 0.09, height * 0.96),
     new THREE.Vector2(0.001, height),
   ];
-  const geo = new THREE.LatheGeometry(pts, 14);
+  const geo = new THREE.LatheGeometry(pts, 16);
   geo.computeVertexNormals();
   return geo;
 }
@@ -414,15 +424,13 @@ function buildTalaTier(
   parent.add(shalaCenter);
 
   // Central Shala miniature barrel crest
-  const shalaCrest = new THREE.Mesh(
-    createSalaRoofGeometry(shalaW * 0.96, d * 0.26, wallH * 0.24),
-    mats.roof
-  );
-  shalaCrest.position.set(0, yBase + shalaH, d / 2 - d * 0.04);
+  const shalaCrestData = createSalaRoofGeometry(shalaW * 0.96, d * 0.26, wallH * 0.24);
+  const shalaCrest = new THREE.Mesh(shalaCrestData.geometry, mats.roof);
+  shalaCrest.position.set(0, yBase + shalaH - 0.008, d / 2 - d * 0.04);
   parent.add(shalaCrest);
 
   const shalaCrestBack = shalaCrest.clone();
-  shalaCrestBack.position.set(0, yBase + shalaH, -(d / 2 - d * 0.04));
+  shalaCrestBack.position.set(0, yBase + shalaH - 0.008, -(d / 2 - d * 0.04));
   parent.add(shalaCrestBack);
 
   // Central Shala recessed doorway/niche accent
@@ -597,14 +605,14 @@ export function buildGopuramGroup(
           createVimanaDomeGeometry(subW * 1.15, 0.22, 4),
           mats.roof
         );
-        subDome.position.set(subX, courtH + subH, subZ);
+        subDome.position.set(subX, courtH + subH - 0.006, subZ);
         root.add(subDome);
 
         const subFinial = new THREE.Mesh(
           createKalasamGeometry(0.11, 0.032),
           mats.finial
         );
-        subFinial.position.set(subX, courtH + subH + 0.2, subZ);
+        subFinial.position.set(subX, courtH + subH + 0.19, subZ);
         root.add(subFinial);
       }
     }
@@ -722,7 +730,7 @@ export function buildGopuramGroup(
   const grivaW = topW * 0.76;
   const grivaD = topD * 0.74;
   const grivaMesh = new THREE.Mesh(
-    new THREE.BoxGeometry(grivaW, grivaH, grivaD),
+    new THREE.BoxGeometry(grivaW, grivaH + 0.02, grivaD),
     mats.secondary
   );
   grivaMesh.position.set(0, currentY + grivaH / 2, 0);
@@ -737,16 +745,26 @@ export function buildGopuramGroup(
       createVimanaDomeGeometry(Math.max(grivaW, grivaD) * 1.18, domeH, domeSides),
       mats.roof
     );
-    dome.position.set(0, currentY, 0);
+    dome.position.set(0, currentY - 0.005, 0);
     root.add(dome);
 
     const kalasamH = 0.28 * params.heightMultiplier;
     const kalasamR = Math.max(0.055, grivaW * 0.14);
+
+    // Solid lotus stupika pedestal seated cleanly onto the dome crown
+    const stupikaH = 0.055;
+    const stupika = new THREE.Mesh(
+      new THREE.CylinderGeometry(kalasamR * 1.35, kalasamR * 1.75, stupikaH, domeSides === 8 ? 8 : 12),
+      mats.cornice
+    );
+    stupika.position.set(0, currentY + domeH * 0.92, 0);
+    root.add(stupika);
+
     const kalasam = new THREE.Mesh(
       createKalasamGeometry(kalasamH, kalasamR),
       mats.finial
     );
-    kalasam.position.set(0, currentY + domeH * 0.95, 0);
+    kalasam.position.set(0, currentY + domeH * 0.92 + stupikaH * 0.45, 0);
     root.add(kalasam);
   } else {
     // Classic Dravidian Barrel-Vaulted Sala-Shikhara
@@ -754,10 +772,8 @@ export function buildGopuramGroup(
     const roofD = topD * 0.94;
     const roofH = Math.max(0.38, topD * 1.02) * params.heightMultiplier;
 
-    const salaRoof = new THREE.Mesh(
-      createSalaRoofGeometry(roofL, roofD, roofH),
-      mats.roof
-    );
+    const salaData = createSalaRoofGeometry(roofL, roofD, roofH);
+    const salaRoof = new THREE.Mesh(salaData.geometry, mats.roof);
     salaRoof.position.set(0, currentY, 0);
     root.add(salaRoof);
 
@@ -765,32 +781,48 @@ export function buildGopuramGroup(
     const gableGeo = createKuduArchGeometry(roofD * 0.92, roofH * 0.94, 0.045);
     const gableLeft = new THREE.Mesh(gableGeo, mats.cornice);
     gableLeft.rotation.y = -Math.PI / 2;
-    gableLeft.position.set(-roofL / 2 - 0.015, currentY + roofH * 0.06, 0);
+    gableLeft.position.set(
+      -(roofL / 2 + salaData.bevelThickness * 0.35),
+      currentY,
+      0
+    );
     root.add(gableLeft);
 
     const gableRight = new THREE.Mesh(gableGeo.clone(), mats.cornice);
     gableRight.rotation.y = Math.PI / 2;
-    gableRight.position.set(roofL / 2 + 0.015, currentY + roofH * 0.06, 0);
+    gableRight.position.set(
+      roofL / 2 + salaData.bevelThickness * 0.35,
+      currentY,
+      0
+    );
     root.add(gableRight);
 
-    // Ridge Stupika Spine
-    const ridgeH = 0.045;
-    const ridgeGeo = new THREE.BoxGeometry(roofL * 0.86, ridgeH, Math.max(0.055, roofD * 0.16));
-    const ridge = new THREE.Mesh(ridgeGeo, mats.cornice);
-    ridge.position.set(0, currentY + roofH, 0);
-    root.add(ridge);
-
-    // Row of Lathe-Turned Kalasam Finials along the ridge
+    // Compute Kalasam dimensions first so the Ridge Stupika Spine supports every finial
     const kCount = Math.max(1, params.kalasamCount);
     const span = roofL * 0.72;
     const kHeight = Math.min(0.24, Math.max(0.14, roofL / (kCount * 1.65)));
     const kRadius = Math.min(0.045, Math.max(0.024, span / (kCount * 3.8)));
 
+    // Actual apex of the bevelled Sala barrel vault is at currentY + roofH + salaData.bevelSize
+    const vaultPeakY = currentY + roofH + salaData.bevelSize;
+    const ridgeH = 0.065;
+    const ridgeLength = Math.max(span + kRadius * 3.2, roofL * 0.88);
+    const ridgeDepth = Math.max(kRadius * 2.5, roofD * 0.22);
+
+    // Embed ridge spine firmly into the vault peak so there is zero gap
+    const ridgeCenterY = vaultPeakY + ridgeH * 0.22;
+    const ridgeTopY = ridgeCenterY + ridgeH * 0.5;
+    const ridgeGeo = new THREE.BoxGeometry(ridgeLength, ridgeH, ridgeDepth);
+    const ridge = new THREE.Mesh(ridgeGeo, mats.cornice);
+    ridge.position.set(0, ridgeCenterY, 0);
+    root.add(ridge);
+
+    // Row of Lathe-Turned Kalasam Finials anchored cleanly onto the ridge spine
     const kalasamGeo = createKalasamGeometry(kHeight, kRadius);
     for (let k = 0; k < kCount; k++) {
       const kx = kCount === 1 ? 0 : (k / (kCount - 1) - 0.5) * span;
       const kalasam = new THREE.Mesh(kalasamGeo, mats.finial);
-      kalasam.position.set(kx, currentY + roofH + ridgeH * 0.75, 0);
+      kalasam.position.set(kx, ridgeTopY - 0.002, 0);
       root.add(kalasam);
     }
   }
