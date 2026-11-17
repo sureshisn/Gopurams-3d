@@ -327,11 +327,12 @@ function buildAditalaWithPortal(
     for (let s = 0; s < stairCount; s++) {
       const sH = plinthH / stairCount;
       const sD = 0.08 * (stairCount - s);
+      const extraH = s === 0 ? 0 : 0.004;
       const step = new THREE.Mesh(
-        new THREE.BoxGeometry(porchStairW, sH + 0.004, sD),
+        new THREE.BoxGeometry(porchStairW, sH + extraH, sD),
         mats.plinth
       );
-      step.position.set(0, porchFloorY + sH * (s + 0.5), porchFrontZ + sD / 2 - 0.02);
+      step.position.set(0, porchFloorY + sH * (s + 0.5) - extraH / 2, porchFrontZ + sD / 2 - 0.02);
       parent.add(step);
     }
 
