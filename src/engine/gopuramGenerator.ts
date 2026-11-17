@@ -205,6 +205,7 @@ function buildAditalaWithPortal(
   depth: number,
   height: number,
   yBase: number,
+  plinthH: number,
   params: GopuramParams,
   mats: GopuramMaterialSet
 ) {
@@ -285,6 +286,54 @@ function buildAditalaWithPortal(
     const porchW = portalW * 1.48;
     const colR = Math.max(0.025, porchW * 0.065);
     const colH = portalH * 0.92;
+    const porchFloorY = yBase - plinthH;
+    const porchFrontZ = depth / 2 + porchD * 1.04;
+    const porchBackZ = depth * 0.32;
+    const porchSpanD = porchFrontZ - porchBackZ;
+    const porchCenterZ = (porchFrontZ + porchBackZ) / 2;
+
+    // Stepped Mandapam porch plinth rising solidly from courtyard/ground (yBase - plinthH) up to yBase
+    const porchLowerH = plinthH * 0.56;
+    const porchUpperH = plinthH * 0.44;
+    const porchPlinthLower = new THREE.Mesh(
+      createRectFrustumGeometry(
+        porchW * 1.16,
+        porchSpanD + 0.06,
+        porchW * 1.11,
+        porchSpanD + 0.02,
+        porchLowerH
+      ),
+      mats.plinth
+    );
+    porchPlinthLower.position.set(0, porchFloorY, porchCenterZ);
+    parent.add(porchPlinthLower);
+
+    const porchPlinthUpper = new THREE.Mesh(
+      createRectFrustumGeometry(
+        porchW * 1.11,
+        porchSpanD + 0.02,
+        porchW * 1.08,
+        porchSpanD,
+        porchUpperH + 0.006
+      ),
+      mats.secondary
+    );
+    porchPlinthUpper.position.set(0, porchFloorY + porchLowerH, porchCenterZ);
+    parent.add(porchPlinthUpper);
+
+    // Porch front steps (Sopana) descending from porch platform to courtyard/ground
+    const porchStairW = porchW * 0.58;
+    const stairCount = 3;
+    for (let s = 0; s < stairCount; s++) {
+      const sH = plinthH / stairCount;
+      const sD = 0.08 * (stairCount - s);
+      const step = new THREE.Mesh(
+        new THREE.BoxGeometry(porchStairW, sH + 0.004, sD),
+        mats.plinth
+      );
+      step.position.set(0, porchFloorY + sH * (s + 0.5), porchFrontZ + sD / 2 - 0.02);
+      parent.add(step);
+    }
 
     const colPositions = [
       [-porchW * 0.42, depth / 2 + porchD * 0.8],
@@ -293,23 +342,42 @@ function buildAditalaWithPortal(
       [porchW * 0.24, depth / 2 + porchD * 0.8],
     ];
     for (const [cx, cz] of colPositions) {
-      const colGeo = new THREE.CylinderGeometry(colR * 0.88, colR * 1.08, colH, 8);
+      // Square pillar base pedestal seated firmly on the porch plinth
+      const baseH = colH * 0.14;
+      const colBase = new THREE.Mesh(
+        new THREE.BoxGeometry(colR * 2.5, baseH, colR * 2.5),
+        mats.plinth
+      );
+      colBase.position.set(cx, yBase + baseH / 2 - 0.004, cz);
+      parent.add(colBase);
+
+      // Column shaft overlapping base & capital
+      const colGeo = new THREE.CylinderGeometry(colR * 0.88, colR * 1.08, colH + 0.01, 8);
       const col = new THREE.Mesh(colGeo, mats.secondary);
       col.position.set(cx, yBase + colH / 2, cz);
       parent.add(col);
+
+      // Bracket capital (Bodhigai) connecting shaft solidly to porch roof
+      const capH = colH * 0.11;
+      const colCap = new THREE.Mesh(
+        new THREE.BoxGeometry(colR * 2.7, capH, colR * 2.5),
+        mats.cornice
+      );
+      colCap.position.set(cx, yBase + colH - capH / 2 + 0.004, cz);
+      parent.add(colCap);
     }
 
-    // Porch roof slab + sloped kapota eave
+    // Porch roof slab + sloped kapota eave anchored back into the Aditala facade
     const porchRoofH = height * 0.14;
     const porchRoofGeo = createRectFrustumGeometry(
       porchW * 1.12,
-      porchD * 1.08,
+      porchD * 1.18,
       porchW * 0.98,
-      porchD * 0.96,
+      porchD * 1.04,
       porchRoofH
     );
     const porchRoof = new THREE.Mesh(porchRoofGeo, mats.cornice);
-    porchRoof.position.set(0, yBase + colH, depth / 2 + porchD * 0.45);
+    porchRoof.position.set(0, yBase + colH - 0.004, depth / 2 + porchD * 0.48);
     parent.add(porchRoof);
   }
 
@@ -406,7 +474,7 @@ function buildTalaTier(
         createVimanaDomeGeometry(kutaSize * 1.15, kutaRoofH, 4),
         mats.roof
       );
-      kutaCap.position.set(sx * kx, yBase + kutaH, sz * kz);
+      kutaCap.position.set(sx * kx, yBase + kutaH - 0.005, sz * kz);
       parent.add(kutaCap);
     }
   }
@@ -540,7 +608,11 @@ export function buildGopuramGroup(
   // ── 1. Optional Prakaram Courtyard Plinth & Compound Walls ──
   if (params.hasCourtyard) {
     const courtW = baseW * (params.archetype === 'complex' ? 1.85 : 1.45);
-    const courtD = baseD * (params.archetype === 'complex' ? 1.85 : 1.48);
+    const minMandapaDepth = params.hasMandapam ? baseD * 2.38 : baseD * 1.48;
+    const courtD = Math.max(
+      baseD * (params.archetype === 'complex' ? 2.05 : 1.48),
+      minMandapaDepth
+    );
     const courtH = 0.14;
 
     const courtBase = new THREE.Mesh(
@@ -661,7 +733,7 @@ export function buildGopuramGroup(
 
   // ── 3. Aditala Ground Storey + Vaasal Portal ──
   const aditalaH = (0.74 + rng() * 0.14) * params.heightMultiplier;
-  buildAditalaWithPortal(root, baseW, baseD, aditalaH, currentY, params, mats);
+  buildAditalaWithPortal(root, baseW, baseD, aditalaH, currentY, plinthH, params, mats);
   currentY += aditalaH;
 
   // Aditala Kapota Cornice
