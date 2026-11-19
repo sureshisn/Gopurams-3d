@@ -1,10 +1,11 @@
-import { Download } from 'lucide-react';
+import { CheckCircle2, Download } from 'lucide-react';
 
 export type ActiveTab = 'studio' | 'gallery' | 'architecture';
 
 interface TopBarProps {
   activeTab: ActiveTab;
   onChangeTab: (tab: ActiveTab) => void;
+  onOpenPrintCheck: () => void;
   onExportSTL: () => void;
   canExport: boolean;
 }
@@ -12,17 +13,18 @@ interface TopBarProps {
 export function TopBar({
   activeTab,
   onChangeTab,
+  onOpenPrintCheck,
   onExportSTL,
   canExport,
 }: TopBarProps) {
   const navItems: { id: ActiveTab; label: string }[] = [
-    { id: 'studio', label: '3D Studio' },
-    { id: 'gallery', label: '1000+ Gallery' },
+    { id: 'studio', label: 'Design' },
+    { id: 'gallery', label: 'Explore 1000+' },
     { id: 'architecture', label: 'Architecture' },
   ];
 
   return (
-    <header className="relative z-30 flex items-center justify-between gap-8 px-6 py-3.5 bg-[#F7F3EC] border-b border-[#1E1916]/10">
+    <header className="relative z-30 flex items-center justify-between gap-6 px-6 py-3.5 bg-[#F7F3EC] border-b border-[#1E1916]/10">
       {/* Zone 1: Single text wordmark */}
       <button
         type="button"
@@ -62,8 +64,16 @@ export function TopBar({
         })}
       </nav>
 
-      {/* Zone 3: Single primary action */}
-      <div className="flex items-center shrink-0">
+      {/* Zone 3: Print Check & Primary Export STL Action */}
+      <div className="flex items-center gap-2 shrink-0">
+        <button
+          type="button"
+          onClick={onOpenPrintCheck}
+          className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-[#1E1916] bg-[#EFE9DF] hover:bg-[#E5DDD0] rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-[#B8432A]"
+        >
+          <CheckCircle2 className="w-3.5 h-3.5 text-[#2C6E49]" aria-hidden="true" />
+          Print Check
+        </button>
         <button
           type="button"
           onClick={onExportSTL}

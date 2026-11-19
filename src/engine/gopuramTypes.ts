@@ -1,16 +1,16 @@
-export type GopuramArchetype = 'gopuram' | 'vimana' | 'complex';
+export type GopuramArchetype = 'gopuram' | 'vimana' | 'complex' | 'relief';
 
 export type GopuramStyle = 'chola' | 'pandya' | 'vijayanagara' | 'nayak';
 
 export type GopuramFinish =
-  | 'ivory'
   | 'polychrome'
+  | 'ivory'
   | 'granite'
   | 'sandstone'
   | 'limestone'
   | 'basalt';
 
-export type PortalStyle = 'arched' | 'corbelled' | 'mandapa' | 'stepped';
+export type PortalStyle = 'arched' | 'cusped' | 'corbelled' | 'stepped';
 
 export type TaperCurve = 'linear' | 'concave' | 'convex' | 'stepped';
 
@@ -20,6 +20,7 @@ export type CameraPreset = 'perspective' | 'front' | 'side' | 'top';
 
 export interface GopuramParams {
   seed: number;
+  customName?: string;
   archetype: GopuramArchetype;
   style: GopuramStyle;
   finish: GopuramFinish;
@@ -29,9 +30,9 @@ export interface GopuramParams {
   taperExponent: number; // 0.65 to 1.45
   taperCurve: TaperCurve;
   portalStyle: PortalStyle;
-  portalScale: number; // 0.24 to 0.42
+  portalScale: number; // 0.24 to 0.44
   shrineDensity: number; // 2 to 6 bays per half-side
-  corniceProjection: number; // 0.04 to 0.14
+  corniceProjection: number; // 0.04 to 0.13
   kalasamCount: number; // 1, 3, 5, 7, 9
   hasCourtyard: boolean;
   hasMandapam: boolean;
@@ -50,6 +51,8 @@ export interface PrintMetrics {
   estimatedGrams: number;
   estimatedPrintMinutes: number;
   maxOverhangDeg: number;
+  minYOffset: number;
+  layerCount: number;
 }
 
 export interface GalleryEntry {

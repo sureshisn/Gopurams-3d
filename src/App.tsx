@@ -2,12 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type * as THREE from 'three';
 import { ArchitectureGuide } from './components/ArchitectureGuide';
 import { Gallery1000 } from './components/Gallery1000';
+import { PrintCheckDialog } from './components/PrintCheckDialog';
 import { StudioDock } from './components/StudioDock';
 import { TopBar, type ActiveTab } from './components/TopBar';
 import { Viewport3D } from './components/Viewport3D';
 import { buildGopuramGroup, disposeBuiltGopuram } from './engine/gopuramGenerator';
 import type {
   CameraPreset,
+  GopuramFinish,
   GopuramParams,
   LightingPreset,
   PrintMetrics,
@@ -19,14 +21,15 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('studio');
   const [params, setParams] = useState<GopuramParams>(() =>
     generateGopuramParamsFromSeed(4821, {
-      archetype: 'gopuram',
+      archetype: 'complex',
       style: 'pandya',
-      finish: 'ivory',
-      tiers: 7,
+      finish: 'polychrome',
+      tiers: 8,
       portalStyle: 'arched',
-      kalasamCount: 5,
-      hasCourtyard: false,
-      hasMandapam: false,
+      kalasamCount: 7,
+      hasCourtyard: true,
+      hasMandapam: true,
+      hasFlankingShrines: true,
     })
   );
   const [metrics, setMetrics] = useState<PrintMetrics | null>(null);
@@ -35,6 +38,9 @@ export default function App() {
   const [cameraPresetTick, setCameraPresetTick] = useState(0);
   const [autoRotate, setAutoRotate] = useState(false);
   const [wireframe, setWireframe] = useState(false);
+  const [exploded, setExploded] = useState(false);
+  const [showBuildVolume, setShowBuildVolume] = useState(true);
+  const [printCheckOpen, setPrintCheckOpen] = useState(false);
   const [dockCollapsed, setDockCollapsed] = useState(false);
   const [batchSeed, setBatchSeed] = useState(100001);
 
@@ -46,6 +52,10 @@ export default function App() {
 
   const handleChangeParams = useCallback((patch: Partial<GopuramParams>) => {
     setParams((prev) => ({ ...prev, ...patch }));
+  }, []);
+
+  const handleChangeFinishLook = useCallback((finish: GopuramFinish) => {
+    setParams((prev) => ({ ...prev, finish }));
   }, []);
 
   const handleRandomizeSeed = useCallback(() => {
@@ -74,6 +84,11 @@ export default function App() {
     setCameraPresetTick((t) => t + 1);
   }, []);
 
+  const handleResetCamera = useCallback(() => {
+    setCameraPreset('perspective');
+    setCameraPresetTick((t) => t + 1);
+  }, []);
+
   const handleSelectFromGallery = useCallback((selected: GopuramParams) => {
     setParams(selected);
     setActiveTab('studio');
@@ -83,7 +98,6 @@ export default function App() {
     setBatchSeed((prev) => prev + 100003);
   }, []);
 
-  // Keyboard shortcut 'H' to toggle bottom control dock
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
@@ -108,6 +122,7 @@ export default function App() {
       <TopBar
         activeTab={activeTab}
         onChangeTab={setActiveTab}
+        onOpenPrintCheck={() => setPrintCheckOpen(true)}
         onExportSTL={handleExportSTL}
         canExport={true}
       />
@@ -121,6 +136,14 @@ export default function App() {
             cameraPresetTick={cameraPresetTick}
             autoRotate={autoRotate}
             wireframe={wireframe}
+            exploded={exploded}
+            showBuildVolume={showBuildVolume}
+            onChangeFinishLook={handleChangeFinishLook}
+            onResetCamera={handleResetCamera}
+            onToggleExploded={() => setExploded((x) => !x)}
+            onToggleAutoRotate={() => setAutoRotate((r) => !r)}
+            onToggleWireframe={() => setWireframe((w) => !w)}
+            onToggleBuildVolume={() => setShowBuildVolume((v) => !v)}
             onMetricsUpdate={setMetrics}
             onGroupReady={handleGroupReady}
           />
@@ -129,18 +152,15 @@ export default function App() {
             metrics={metrics}
             lighting={lighting}
             cameraPreset={cameraPreset}
-            autoRotate={autoRotate}
-            wireframe={wireframe}
             collapsed={dockCollapsed}
             onToggleCollapse={() => setDockCollapsed((c) => !c)}
             onChangeParams={handleChangeParams}
             onRandomizeSeed={handleRandomizeSeed}
             onApplySeedString={handleApplySeedString}
             onOpen1000Gallery={() => setActiveTab('gallery')}
+            onOpenPrintCheck={() => setPrintCheckOpen(true)}
             onChangeLighting={setLighting}
             onSelectCamera={handleSelectCamera}
-            onToggleAutoRotate={() => setAutoRotate((r) => !r)}
-            onToggleWireframe={() => setWireframe((w) => !w)}
           />
         </div>
       )}
@@ -160,6 +180,14 @@ export default function App() {
           <ArchitectureGuide onLoadPreset={handleSelectFromGallery} />
         </div>
       )}
+
+      <PrintCheckDialog
+        open={printCheckOpen}
+        params={params}
+        metrics={metrics}
+        onClose={() => setPrintCheckOpen(false)}
+        onExportSTL={handleExportSTL}
+      />
     </div>
   );
 }

@@ -48,10 +48,10 @@ class SharedThumbnailRenderer {
     scene.environment = this.pmremEnv;
     pmrem.dispose();
 
-    const hemi = new THREE.HemisphereLight(0xf6f8fc, 0xb89c7d, 0.72);
+    const hemi = new THREE.HemisphereLight(0xf6f8fc, 0xb89c7d, 0.78);
     scene.add(hemi);
 
-    const key = new THREE.DirectionalLight(0xfff1dc, 2.25);
+    const key = new THREE.DirectionalLight(0xfff1dc, 2.2);
     key.position.set(5, 8, 6);
     scene.add(key);
 
@@ -59,17 +59,20 @@ class SharedThumbnailRenderer {
     rim.position.set(-5, 4, -5);
     scene.add(rim);
 
-    // Subtle matte ground disc under thumbnail model
-    const discGeo = new THREE.CircleGeometry(2.6, 36);
-    discGeo.rotateX(-Math.PI / 2);
-    const discMat = new THREE.MeshStandardMaterial({
-      color: 0xe6dfd2,
-      roughness: 0.96,
-      metalness: 0.0,
+    // Matte dark-slate 3D printer build pad matching the studio aesthetic
+    const bedGeo = new THREE.BoxGeometry(4.2, 0.04, 4.2);
+    const bedMat = new THREE.MeshStandardMaterial({
+      color: 0x5c6066,
+      roughness: 0.92,
+      metalness: 0.05,
     });
-    const disc = new THREE.Mesh(discGeo, discMat);
-    disc.position.y = -0.005;
-    scene.add(disc);
+    const bed = new THREE.Mesh(bedGeo, bedMat);
+    bed.position.y = -0.022;
+    scene.add(bed);
+
+    const grid = new THREE.GridHelper(4.2, 12, 0x3b3e42, 0x474b50);
+    grid.position.y = -0.001;
+    scene.add(grid);
 
     const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 80);
     this.renderer = renderer;
@@ -82,7 +85,7 @@ class SharedThumbnailRenderer {
   }
 
   public renderThumbnail(params: GopuramParams): string {
-    const cacheKey = `${params.seed}_${params.finish}_${params.archetype}_${params.tiers}`;
+    const cacheKey = `v2_${params.seed}_${params.finish}_${params.archetype}_${params.tiers}`;
     const existing = this.cache.get(cacheKey);
     if (existing) return existing;
 
@@ -92,7 +95,6 @@ class SharedThumbnailRenderer {
     const built = buildGopuramGroup(params);
     this.scene.add(built.group);
 
-    // Fit camera cleanly to gopuram bounds at classic 3/4 isometric-like angle
     const box = built.rawBounds;
     const size = new THREE.Vector3();
     const center = new THREE.Vector3();
@@ -101,14 +103,14 @@ class SharedThumbnailRenderer {
 
     const maxDim = Math.max(size.x, size.y * 1.08, size.z);
     const fovRad = THREE.MathUtils.degToRad(this.camera.fov);
-    const dist = (maxDim / 2 / Math.tan(fovRad / 2)) * 1.48;
+    const dist = (maxDim / 2 / Math.tan(fovRad / 2)) * 1.5;
 
     this.camera.position.set(
       center.x + dist * 0.56,
       center.y + dist * 0.34,
       center.z + dist * 0.78
     );
-    this.camera.lookAt(center.x, center.y * 0.96, center.z);
+    this.camera.lookAt(center.x, center.y * 0.94, center.z);
     this.camera.updateProjectionMatrix();
 
     this.renderer.render(this.scene, this.camera);
@@ -117,7 +119,6 @@ class SharedThumbnailRenderer {
     this.scene.remove(built.group);
     disposeBuiltGopuram(built);
 
-    // Keep cache bounded around 350 thumbnails
     if (this.cache.size > 350) {
       const firstKey = this.cache.keys().next().value;
       if (firstKey) this.cache.delete(firstKey);

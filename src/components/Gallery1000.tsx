@@ -31,7 +31,6 @@ export function Gallery1000({
   const [page, setPage] = useState(0);
   const [thumbnails, setThumbnails] = useState<Record<number, string>>({});
 
-  // Deterministically generate all 1,008 unique gopuram specs in milliseconds
   const allEntries = useMemo<GalleryEntry[]>(() => {
     const entries: GalleryEntry[] = [];
     for (let i = 0; i < TOTAL_COUNT; i++) {
@@ -67,22 +66,19 @@ export function Gallery1000({
     return filteredEntries.slice(start, start + PAGE_SIZE);
   }, [filteredEntries, safePage]);
 
-  // Reset page when filters or batch change
   useEffect(() => {
     setPage(0);
   }, [archetypeFilter, finishFilter, baseBatchSeed]);
 
-  // Progressive non-blocking 3D WebGL thumbnail rendering (2 per animation frame)
   useEffect(() => {
     let cancelled = false;
     let rafId = 0;
 
-    // Immediately load any cached thumbnails
     const initialMap: Record<number, string> = {};
     const pending: GalleryEntry[] = [];
 
     for (const entry of visibleEntries) {
-      const key = `${entry.params.seed}_${entry.params.finish}_${entry.params.archetype}_${entry.params.tiers}`;
+      const key = `v2_${entry.params.seed}_${entry.params.finish}_${entry.params.archetype}_${entry.params.tiers}`;
       const cached = thumbnailRenderer.getCached(key);
       if (cached) {
         initialMap[entry.seed] = cached;
@@ -137,7 +133,6 @@ export function Gallery1000({
   return (
     <main className="min-h-[calc(100vh-57px)] bg-[#F7F3EC] px-6 py-8">
       <div className="max-w-7xl mx-auto">
-        {/* Reel-Inspired Showcase Header Card */}
         <section className="bg-[#FAF7F2] border border-[#3B171E]/20 rounded-2xl p-6 md:p-8 shadow-sm">
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-6 border-b border-[#1E1916]/10">
             <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
@@ -149,7 +144,7 @@ export function Gallery1000({
                   new gopurams
                 </h1>
                 <p className="mt-1 text-sm text-[#1E1916]/65">
-                  every one different · all print-ready · click any tower to inspect or export STL
+                  every one different · all support-free · open any design to customize or export STL
                 </p>
               </div>
             </div>
@@ -169,13 +164,14 @@ export function Gallery1000({
           {/* Filter Toolbar */}
           <div className="flex flex-wrap items-center justify-between gap-4 py-4">
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1 p-1 bg-[#EFE9DF] rounded-lg">
+              <div className="flex items-center gap-1 p-1 bg-[#EFE9DF] rounded-lg overflow-x-auto">
                 {(
                   [
-                    { id: 'all', label: 'All Structures' },
+                    { id: 'all', label: 'All' },
                     { id: 'gopuram', label: 'Gopurams' },
-                    { id: 'vimana', label: 'Vimanas' },
+                    { id: 'vimana', label: 'Mandirs' },
                     { id: 'complex', label: 'Complexes' },
+                    { id: 'relief', label: 'Wall Reliefs' },
                   ] as const
                 ).map((item) => (
                   <button
@@ -201,7 +197,7 @@ export function Gallery1000({
                 }
                 className="px-3 py-2 text-xs font-medium bg-[#EFE9DF] border border-[#1E1916]/10 rounded-lg text-[#1E1916] cursor-pointer"
               >
-                <option value="all">All Finishes</option>
+                <option value="all">All Looks</option>
                 {FINISH_CATALOG.map((f) => (
                   <option key={f.id} value={f.id}>
                     {f.name}
@@ -287,7 +283,9 @@ export function Gallery1000({
 
                   <div className="mt-1.5 w-full flex items-center justify-between gap-1 px-0.5 text-[11px]">
                     <span className="font-medium text-[#1E1916]/85 truncate">
-                      {entry.params.tiers}T · {entry.params.style}
+                      {entry.params.archetype === 'relief'
+                        ? `Relief · ${entry.params.style}`
+                        : `${entry.params.tiers}T · ${entry.params.style}`}
                     </span>
                     <span className="font-mono-tabular text-[#1E1916]/50 shrink-0">
                       #{entry.seed % 10000}

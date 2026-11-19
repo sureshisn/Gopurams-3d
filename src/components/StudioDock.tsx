@@ -1,12 +1,10 @@
 import {
   ChevronDown,
   ChevronUp,
-  Grid2X2,
-  RotateCw,
   Shuffle,
   Sparkles,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FINISH_CATALOG } from '../engine/gopuramMaterials';
 import type {
   CameraPreset,
@@ -24,46 +22,40 @@ interface StudioDockProps {
   metrics: PrintMetrics | null;
   lighting: LightingPreset;
   cameraPreset: CameraPreset;
-  autoRotate: boolean;
-  wireframe: boolean;
   collapsed: boolean;
   onToggleCollapse: () => void;
   onChangeParams: (patch: Partial<GopuramParams>) => void;
   onRandomizeSeed: () => void;
   onApplySeedString: (val: string) => void;
   onOpen1000Gallery: () => void;
+  onOpenPrintCheck: () => void;
   onChangeLighting: (l: LightingPreset) => void;
   onSelectCamera: (c: CameraPreset) => void;
-  onToggleAutoRotate: () => void;
-  onToggleWireframe: () => void;
 }
 
-type DockTab = 'seed' | 'architecture' | 'finish';
+type DockTab = 'style' | 'shape' | 'name' | 'look' | 'print';
 
 export function StudioDock({
   params,
   metrics,
   lighting,
   cameraPreset,
-  autoRotate,
-  wireframe,
   collapsed,
   onToggleCollapse,
   onChangeParams,
   onRandomizeSeed,
   onApplySeedString,
   onOpen1000Gallery,
+  onOpenPrintCheck,
   onChangeLighting,
   onSelectCamera,
-  onToggleAutoRotate,
-  onToggleWireframe,
 }: StudioDockProps) {
-  const [dockTab, setDockTab] = useState<DockTab>('seed');
+  const [dockTab, setDockTab] = useState<DockTab>('style');
   const [seedInput, setSeedInput] = useState(String(params.seed));
 
-  const syncSeedInput = (nextSeed: number) => {
-    setSeedInput(String(nextSeed));
-  };
+  useEffect(() => {
+    setSeedInput(String(params.seed));
+  }, [params.seed]);
 
   const handleSeedSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,8 +64,9 @@ export function StudioDock({
 
   const archetypes: { id: GopuramArchetype; label: string }[] = [
     { id: 'gopuram', label: 'Gopuram' },
-    { id: 'vimana', label: 'Vimana' },
+    { id: 'vimana', label: 'Mandir' },
     { id: 'complex', label: 'Complex' },
+    { id: 'relief', label: 'Wall Relief' },
   ];
 
   const styles: { id: GopuramStyle; label: string }[] = [
@@ -85,9 +78,9 @@ export function StudioDock({
 
   const portals: { id: PortalStyle; label: string }[] = [
     { id: 'arched', label: 'Arched' },
+    { id: 'cusped', label: 'Cusped' },
     { id: 'corbelled', label: 'Corbelled' },
     { id: 'stepped', label: 'Stepped' },
-    { id: 'mandapa', label: 'Lintelled' },
   ];
 
   const curves: { id: TaperCurve; label: string }[] = [
@@ -105,14 +98,16 @@ export function StudioDock({
   ];
 
   const lightings: { id: LightingPreset; label: string }[] = [
-    { id: 'studio', label: 'Studio' },
+    { id: 'studio', label: 'Studio Daylight' },
     { id: 'golden', label: 'Golden Hour' },
     { id: 'dusk', label: 'Temple Dusk' },
   ];
 
+  const isTower = params.archetype === 'gopuram' || params.archetype === 'complex';
+
   return (
     <div
-      className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-20 w-[min(920px,94vw)] transition-transform duration-200 ease-out ${
+      className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-20 w-[min(940px,94vw)] transition-transform duration-200 ease-out ${
         collapsed ? 'translate-y-[calc(100%-34px)]' : 'translate-y-0'
       }`}
     >
@@ -137,16 +132,18 @@ export function StudioDock({
         </button>
       </div>
 
-      {/* Main Dock Panel (solid warm paper — zero backdrop-blur over WebGL) */}
+      {/* Main Dock Panel */}
       <div className="bg-[#F7F3EC] border border-[#1E1916]/15 rounded-xl shadow-lg p-4">
-        {/* Dock Tab Bar + Quick Actions */}
+        {/* Reel 5-Step Dock Bar: Style · Shape · Name · Look · Print */}
         <div className="flex flex-wrap items-center justify-between gap-3 pb-3 mb-3 border-b border-[#1E1916]/10">
-          <div className="flex items-center gap-1 p-1 bg-[#EFE9DF] rounded-lg">
+          <div className="flex items-center gap-1 p-1 bg-[#EFE9DF] rounded-lg overflow-x-auto">
             {(
               [
-                { id: 'seed', label: 'Seed & Style' },
-                { id: 'architecture', label: 'Tiers & Proportions' },
-                { id: 'finish', label: 'Finish & Camera' },
+                { id: 'style', label: 'Style' },
+                { id: 'shape', label: 'Shape' },
+                { id: 'name', label: 'Name & Seed' },
+                { id: 'look', label: 'Look' },
+                { id: 'print', label: 'Print' },
               ] as const
             ).map((t) => (
               <button
@@ -167,14 +164,11 @@ export function StudioDock({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => {
-                onRandomizeSeed();
-                setSeedInput('');
-              }}
+              onClick={onRandomizeSeed}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#1E1916] bg-[#EFE9DF] hover:bg-[#E5DDD0] rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               <Shuffle className="w-3.5 h-3.5" aria-hidden="true" />
-              Random Seed
+              New Design
             </button>
             <button
               type="button"
@@ -187,51 +181,25 @@ export function StudioDock({
           </div>
         </div>
 
-        {/* Tab 1: Seed & Style */}
-        {dockTab === 'seed' && (
+        {/* Step 1: Style (Archetype, Dynasty & Structural Add-ons) */}
+        {dockTab === 'style' && (
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-            <form onSubmit={handleSeedSubmit} className="md:col-span-4 flex flex-col gap-1.5">
-              <label
-                htmlFor="seed-input"
-                className="text-xs font-medium text-[#1E1916]/75"
-              >
-                Seed Number or Word
-              </label>
-              <div className="flex gap-1.5">
-                <input
-                  id="seed-input"
-                  type="text"
-                  value={seedInput || String(params.seed)}
-                  onChange={(e) => setSeedInput(e.target.value)}
-                  placeholder="e.g. 4821 or Madurai"
-                  className="w-full px-2.5 py-1.5 text-xs font-mono-tabular bg-white border border-[#1E1916]/15 rounded-lg text-[#1E1916] focus:outline-2 focus:outline-[#B8432A]"
-                />
-                <button
-                  type="submit"
-                  className="px-3 py-1.5 text-xs font-medium bg-[#3B171E] text-[#F7F3EC] rounded-lg hover:bg-[#52212A] whitespace-nowrap shrink-0 cursor-pointer"
-                >
-                  Apply
-                </button>
-              </div>
-            </form>
-
-            <div className="md:col-span-4 flex flex-col gap-1.5">
+            <div className="md:col-span-6 flex flex-col gap-1.5">
               <span className="text-xs font-medium text-[#1E1916]/75">
-                Structure Archetype
+                Temple Archetype
               </span>
               <div className="flex items-center gap-1 p-1 bg-[#EFE9DF] rounded-lg">
                 {archetypes.map((a) => (
                   <button
                     key={a.id}
                     type="button"
-                    onClick={() => {
-                      syncSeedInput(params.seed);
+                    onClick={() =>
                       onChangeParams({
                         archetype: a.id,
-                        hasCourtyard: a.id === 'complex' ? true : params.hasCourtyard,
-                        hasMandapam: a.id === 'complex' ? true : params.hasMandapam,
-                      });
-                    }}
+                        hasCourtyard: a.id === 'complex' ? true : a.id === 'relief' || a.id === 'vimana' ? false : params.hasCourtyard,
+                        hasMandapam: a.id === 'complex' ? true : a.id === 'relief' || a.id === 'vimana' ? false : params.hasMandapam,
+                      })
+                    }
                     className={`flex-1 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                       params.archetype === a.id
                         ? 'bg-[#F7F3EC] text-[#3B171E] shadow-xs'
@@ -244,7 +212,7 @@ export function StudioDock({
               </div>
             </div>
 
-            <div className="md:col-span-4 flex flex-col gap-1.5">
+            <div className="md:col-span-6 flex flex-col gap-1.5">
               <span className="text-xs font-medium text-[#1E1916]/75">
                 Dynastic Proportion
               </span>
@@ -270,29 +238,32 @@ export function StudioDock({
               <label className="inline-flex items-center gap-2 text-xs text-[#1E1916]/85 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={params.hasCourtyard}
+                  disabled={!isTower}
+                  checked={isTower && params.hasCourtyard}
                   onChange={(e) => onChangeParams({ hasCourtyard: e.target.checked })}
-                  className="accent-[#B8432A] w-3.5 h-3.5"
+                  className="accent-[#B8432A] w-3.5 h-3.5 disabled:opacity-40"
                 />
                 Prakaram Courtyard Walls
               </label>
               <label className="inline-flex items-center gap-2 text-xs text-[#1E1916]/85 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={params.hasMandapam}
+                  disabled={!isTower}
+                  checked={isTower && params.hasMandapam}
                   onChange={(e) => onChangeParams({ hasMandapam: e.target.checked })}
-                  className="accent-[#B8432A] w-3.5 h-3.5"
+                  className="accent-[#B8432A] w-3.5 h-3.5 disabled:opacity-40"
                 />
-                Pillared Entrance Porch
+                Mandapam Entrance Porch
               </label>
               <label className="inline-flex items-center gap-2 text-xs text-[#1E1916]/85 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={params.hasFlankingShrines}
+                  disabled={!isTower}
+                  checked={isTower && params.hasFlankingShrines}
                   onChange={(e) => onChangeParams({ hasFlankingShrines: e.target.checked })}
-                  className="accent-[#B8432A] w-3.5 h-3.5"
+                  className="accent-[#B8432A] w-3.5 h-3.5 disabled:opacity-40"
                 />
-                Flanking Satellite Shrines
+                Corner Gate Towers
               </label>
               <label className="inline-flex items-center gap-2 text-xs text-[#1E1916]/85 cursor-pointer">
                 <input
@@ -307,8 +278,8 @@ export function StudioDock({
           </div>
         )}
 
-        {/* Tab 2: Tiers & Proportions */}
-        {dockTab === 'architecture' && (
+        {/* Step 2: Shape (Tiers, Proportions, Taper Curve & Portal) */}
+        {dockTab === 'shape' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <div className="flex flex-col gap-1.5">
               <div className="flex justify-between text-xs">
@@ -322,9 +293,10 @@ export function StudioDock({
                 min={3}
                 max={11}
                 step={1}
+                disabled={params.archetype === 'relief'}
                 value={params.tiers}
                 onChange={(e) => onChangeParams({ tiers: Number(e.target.value) })}
-                className="studio-slider w-full"
+                className="studio-slider w-full disabled:opacity-40"
               />
             </div>
 
@@ -380,7 +352,7 @@ export function StudioDock({
                 min={1}
                 max={9}
                 step={2}
-                disabled={params.archetype === 'vimana'}
+                disabled={params.archetype === 'vimana' || params.archetype === 'relief'}
                 value={params.archetype === 'vimana' ? 1 : params.kalasamCount}
                 onChange={(e) => onChangeParams({ kalasamCount: Number(e.target.value) })}
                 className="studio-slider w-full disabled:opacity-40"
@@ -411,7 +383,7 @@ export function StudioDock({
 
             <div className="sm:col-span-2 flex flex-col gap-1.5">
               <span className="text-xs font-medium text-[#1E1916]/75">
-                Vaasal Portal Gateway
+                Vaasal Gateway Arch
               </span>
               <div className="flex items-center gap-1 p-1 bg-[#EFE9DF] rounded-lg">
                 {portals.map((p) => (
@@ -433,12 +405,59 @@ export function StudioDock({
           </div>
         )}
 
-        {/* Tab 3: Finish, Print Scale & Camera */}
-        {dockTab === 'finish' && (
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+        {/* Step 3: Name & Seed */}
+        {dockTab === 'name' && (
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+            <form onSubmit={handleSeedSubmit} className="md:col-span-6 flex flex-col gap-1.5">
+              <label
+                htmlFor="seed-input"
+                className="text-xs font-medium text-[#1E1916]/75"
+              >
+                Seed Number or Inspiration Word
+              </label>
+              <div className="flex gap-1.5">
+                <input
+                  id="seed-input"
+                  type="text"
+                  value={seedInput}
+                  onChange={(e) => setSeedInput(e.target.value)}
+                  placeholder="e.g. 4821, Madurai, Thanjavur"
+                  className="w-full px-2.5 py-1.5 text-xs font-mono-tabular bg-white border border-[#1E1916]/15 rounded-lg text-[#1E1916] focus:outline-2 focus:outline-[#B8432A]"
+                />
+                <button
+                  type="submit"
+                  className="px-3.5 py-1.5 text-xs font-medium bg-[#3B171E] text-[#F7F3EC] rounded-lg hover:bg-[#52212A] whitespace-nowrap shrink-0 cursor-pointer"
+                >
+                  Apply Seed
+                </button>
+              </div>
+            </form>
+
             <div className="md:col-span-6 flex flex-col gap-1.5">
+              <label
+                htmlFor="custom-name-input"
+                className="text-xs font-medium text-[#1E1916]/75"
+              >
+                Custom Temple Title (Optional)
+              </label>
+              <input
+                id="custom-name-input"
+                type="text"
+                value={params.customName ?? ''}
+                onChange={(e) => onChangeParams({ customName: e.target.value })}
+                placeholder="e.g. Sri Meenakshi East Gopuram"
+                className="w-full px-2.5 py-1.5 text-xs bg-white border border-[#1E1916]/15 rounded-lg text-[#1E1916] focus:outline-2 focus:outline-[#B8432A]"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: Look (Hand-Painted vs Filament Finishes + Camera + Lighting) */}
+        {dockTab === 'look' && (
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+            <div className="md:col-span-7 flex flex-col gap-1.5">
               <span className="text-xs font-medium text-[#1E1916]/75">
-                Surface Finish & Temple Palette
+                Surface Palette (Hand-painted Polychrome &amp; As-printed Materials)
               </span>
               <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
                 {FINISH_CATALOG.map((f) => {
@@ -477,34 +496,7 @@ export function StudioDock({
               </div>
             </div>
 
-            <div className="md:col-span-3 flex flex-col gap-1.5">
-              <div className="flex justify-between text-xs">
-                <span className="font-medium text-[#1E1916]/75">STL Print Height</span>
-                <span className="font-mono-tabular font-medium text-[#3B171E]">
-                  {params.targetHeightMm} mm
-                </span>
-              </div>
-              <input
-                type="range"
-                min={80}
-                max={240}
-                step={5}
-                value={params.targetHeightMm}
-                onChange={(e) =>
-                  onChangeParams({ targetHeightMm: Number(e.target.value) })
-                }
-                className="studio-slider w-full"
-              />
-              {metrics && (
-                <div className="text-[11px] font-mono-tabular text-[#1E1916]/65">
-                  {metrics.triangleCount.toLocaleString()} tris · ~
-                  {Math.floor(metrics.estimatedPrintMinutes / 60)}h{' '}
-                  {metrics.estimatedPrintMinutes % 60}m print
-                </div>
-              )}
-            </div>
-
-            <div className="md:col-span-3 flex flex-col gap-2">
+            <div className="md:col-span-5 flex flex-col gap-2">
               <div className="flex items-center gap-1 p-1 bg-[#EFE9DF] rounded-lg">
                 {cameras.map((cam) => (
                   <button
@@ -521,44 +513,76 @@ export function StudioDock({
                   </button>
                 ))}
               </div>
-              <div className="flex items-center gap-1.5">
-                <select
-                  aria-label="Lighting preset"
-                  value={lighting}
-                  onChange={(e) => onChangeLighting(e.target.value as LightingPreset)}
-                  className="flex-1 px-2 py-1 text-[11px] font-medium bg-[#EFE9DF] border border-[#1E1916]/10 rounded-md text-[#1E1916] cursor-pointer"
-                >
-                  {lightings.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.label}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={onToggleAutoRotate}
-                  title="Toggle turntable rotation"
-                  className={`p-1.5 rounded-md border transition-colors cursor-pointer ${
-                    autoRotate
-                      ? 'bg-[#3B171E] text-[#F7F3EC] border-[#3B171E]'
-                      : 'bg-[#EFE9DF] text-[#1E1916]/75 border-transparent hover:border-[#1E1916]/20'
-                  }`}
-                >
-                  <RotateCw className="w-3.5 h-3.5" aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  onClick={onToggleWireframe}
-                  title="Toggle wireframe mesh view"
-                  className={`p-1.5 rounded-md border transition-colors cursor-pointer ${
-                    wireframe
-                      ? 'bg-[#3B171E] text-[#F7F3EC] border-[#3B171E]'
-                      : 'bg-[#EFE9DF] text-[#1E1916]/75 border-transparent hover:border-[#1E1916]/20'
-                  }`}
-                >
-                  <Grid2X2 className="w-3.5 h-3.5" aria-hidden="true" />
-                </button>
+              <select
+                aria-label="Lighting preset"
+                value={lighting}
+                onChange={(e) => onChangeLighting(e.target.value as LightingPreset)}
+                className="w-full px-2.5 py-1.5 text-xs font-medium bg-[#EFE9DF] border border-[#1E1916]/10 rounded-lg text-[#1E1916] cursor-pointer"
+              >
+                {lightings.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* Step 5: Print Scale & Readiness */}
+        {dockTab === 'print' && (
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+            <div className="md:col-span-5 flex flex-col gap-1.5">
+              <div className="flex justify-between text-xs">
+                <span className="font-medium text-[#1E1916]/75">STL Target Height</span>
+                <span className="font-mono-tabular font-medium text-[#3B171E]">
+                  {params.targetHeightMm} mm
+                </span>
               </div>
+              <input
+                type="range"
+                min={80}
+                max={240}
+                step={5}
+                value={params.targetHeightMm}
+                onChange={(e) =>
+                  onChangeParams({ targetHeightMm: Number(e.target.value) })
+                }
+                className="studio-slider w-full"
+              />
+              <div className="text-[11px] text-[#1E1916]/60">
+                Recommended: 0.16–0.20 mm layer height · 2 walls · 15% gyroid infill · 0 supports
+              </div>
+            </div>
+
+            <div className="md:col-span-7 flex flex-wrap items-center justify-between gap-3 p-3 rounded-lg bg-[#EFE9DF]/70 border border-[#1E1916]/10">
+              {metrics && (
+                <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs font-mono-tabular">
+                  <div>
+                    <span className="text-[#1E1916]/55">Bed: </span>
+                    <span className="font-semibold">
+                      {metrics.widthMm} × {metrics.depthMm} × {metrics.heightMm} mm
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[#1E1916]/55">Mass: </span>
+                    <span className="font-semibold">{metrics.estimatedGrams} g PLA</span>
+                  </div>
+                  <div>
+                    <span className="text-[#1E1916]/55">Overhang: </span>
+                    <span className="font-semibold text-[#2C6E49]">
+                      ≤ {metrics.maxOverhangDeg}° (No Supports)
+                    </span>
+                  </div>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={onOpenPrintCheck}
+                className="px-3 py-1.5 text-xs font-semibold text-[#3B171E] bg-[#F7F3EC] border border-[#1E1916]/15 hover:bg-white rounded-md whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                Full Print Check
+              </button>
             </div>
           </div>
         )}

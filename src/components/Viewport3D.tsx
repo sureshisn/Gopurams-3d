@@ -3,12 +3,20 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import {
+  Box,
+  Grid2X2,
+  Layers,
+  RotateCcw,
+  RotateCw,
+} from 'lucide-react';
+import {
   buildGopuramGroup,
   disposeBuiltGopuram,
   type BuiltGopuram,
 } from '../engine/gopuramGenerator';
 import type {
   CameraPreset,
+  GopuramFinish,
   GopuramParams,
   LightingPreset,
   PrintMetrics,
@@ -23,6 +31,14 @@ interface Viewport3DProps {
   cameraPresetTick: number;
   autoRotate: boolean;
   wireframe: boolean;
+  exploded: boolean;
+  showBuildVolume: boolean;
+  onChangeFinishLook: (finish: GopuramFinish) => void;
+  onResetCamera: () => void;
+  onToggleExploded: () => void;
+  onToggleAutoRotate: () => void;
+  onToggleWireframe: () => void;
+  onToggleBuildVolume: () => void;
   onMetricsUpdate: (metrics: PrintMetrics) => void;
   onGroupReady: (group: THREE.Group | null) => void;
 }
@@ -38,41 +54,49 @@ const LIGHTING_CONFIGS: Record<
     keyIntensity: number;
     rimColor: number;
     rimIntensity: number;
-    plinthColor: number;
+    bedColor: number;
+    gridMajor: number;
+    gridMinor: number;
   }
 > = {
   studio: {
-    bg: 0xf4efe5,
-    sky: 0xf7f9fc,
-    ground: 0xc2b29b,
-    hemiIntensity: 0.78,
-    keyColor: 0xfff2dc,
-    keyIntensity: 2.2,
+    bg: 0xf3efe6,
+    sky: 0xf8fafc,
+    ground: 0xbda88f,
+    hemiIntensity: 0.85,
+    keyColor: 0xfff3de,
+    keyIntensity: 2.15,
     rimColor: 0xd9e4f2,
-    rimIntensity: 0.85,
-    plinthColor: 0xe6dfd2,
+    rimIntensity: 0.82,
+    bedColor: 0x5d6268,
+    gridMajor: 0x3b3f44,
+    gridMinor: 0x4b5056,
   },
   golden: {
     bg: 0xf2e8d8,
     sky: 0xffe4bc,
     ground: 0x9b6e49,
-    hemiIntensity: 0.65,
+    hemiIntensity: 0.68,
     keyColor: 0xffc885,
-    keyIntensity: 2.65,
+    keyIntensity: 2.55,
     rimColor: 0x89a8d6,
     rimIntensity: 0.9,
-    plinthColor: 0xe2d5c1,
+    bedColor: 0x575658,
+    gridMajor: 0x383638,
+    gridMinor: 0x49474a,
   },
   dusk: {
     bg: 0x222026,
     sky: 0x6f7ea8,
     ground: 0x3b2a22,
-    hemiIntensity: 0.6,
+    hemiIntensity: 0.62,
     keyColor: 0xffb870,
-    keyIntensity: 2.4,
+    keyIntensity: 2.35,
     rimColor: 0x6ba2e6,
     rimIntensity: 1.15,
-    plinthColor: 0x312e36,
+    bedColor: 0x33353b,
+    gridMajor: 0x1e2024,
+    gridMinor: 0x292b30,
   },
 };
 
@@ -91,9 +115,9 @@ function createRadialShadowTexture(): THREE.CanvasTexture {
       size / 2,
       size / 2
     );
-    grad.addColorStop(0, 'rgba(24, 18, 14, 0.36)');
-    grad.addColorStop(0.55, 'rgba(24, 18, 14, 0.14)');
-    grad.addColorStop(1, 'rgba(24, 18, 14, 0)');
+    grad.addColorStop(0, 'rgba(18, 16, 14, 0.34)');
+    grad.addColorStop(0.55, 'rgba(18, 16, 14, 0.12)');
+    grad.addColorStop(1, 'rgba(18, 16, 14, 0)');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, size, size);
   }
@@ -109,14 +133,26 @@ export function Viewport3D({
   cameraPresetTick,
   autoRotate,
   wireframe,
+  exploded,
+  showBuildVolume,
+  onChangeFinishLook,
+  onResetCamera,
+  onToggleExploded,
+  onToggleAutoRotate,
+  onToggleWireframe,
+  onToggleBuildVolume,
   onMetricsUpdate,
   onGroupReady,
 }: Viewport3DProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const [contextLost, setContextLost] = useState(false);
   const [liveMetrics, setLiveMetrics] = useState<PrintMetrics | null>(null);
+  const lastPrintedFinishRef = useRef<GopuramFinish>('ivory');
 
-  // Refs to hold Three.js objects without tearing down the canvas on state changes
+  if (params.finish !== 'polychrome') {
+    lastPrintedFinishRef.current = params.finish;
+  }
+
   const engineRef = useRef<{
     renderer: THREE.WebGLRenderer;
     scene: THREE.Scene;
@@ -125,10 +161,14 @@ export function Viewport3D({
     hemi: THREE.HemisphereLight;
     key: THREE.DirectionalLight;
     rim: THREE.DirectionalLight;
-    plinthMat: THREE.MeshStandardMaterial;
+    bedMat: THREE.MeshStandardMaterial;
+    gridMesh: THREE.GridHelper;
+    cageGroup: THREE.Group;
     built: BuiltGopuram | null;
     isSoftwareGl: boolean;
     autoRotate: boolean;
+    explodedTarget: number;
+    explodeCurrent: number;
     targetCamPos: THREE.Vector3 | null;
     targetLookAt: THREE.Vector3 | null;
     requestRender: () => void;
@@ -151,7 +191,7 @@ export function Viewport3D({
     });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
+    renderer.toneMappingExposure = 1.08;
     renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = !isSoftwareGl;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -174,14 +214,14 @@ export function Viewport3D({
     const scene = new THREE.Scene();
     const initLight = LIGHTING_CONFIGS.studio;
     scene.background = new THREE.Color(initLight.bg);
-    scene.fog = new THREE.FogExp2(initLight.bg, 0.032);
+    scene.fog = new THREE.FogExp2(initLight.bg, 0.025);
 
     const pmrem = new THREE.PMREMGenerator(renderer);
     const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     scene.environment = envTex;
     pmrem.dispose();
 
-    const camera = new THREE.PerspectiveCamera(36, width / height, 0.1, 120);
+    const camera = new THREE.PerspectiveCamera(35, width / height, 0.1, 120);
     camera.position.set(4.5, 3.2, 5.8);
 
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -207,57 +247,63 @@ export function Viewport3D({
     key.shadow.mapSize.set(2048, 2048);
     key.shadow.camera.near = 1;
     key.shadow.camera.far = 28;
-    const d = 5.5;
+    const d = 4.5;
     key.shadow.camera.left = -d;
     key.shadow.camera.right = d;
     key.shadow.camera.top = d;
     key.shadow.camera.bottom = -d;
-    key.shadow.bias = -0.0005;
-    key.shadow.normalBias = 0.02;
+    key.shadow.bias = -0.0004;
+    key.shadow.normalBias = 0.018;
     scene.add(key);
 
     const rim = new THREE.DirectionalLight(initLight.rimColor, initLight.rimIntensity);
     rim.position.set(-6, 5, -6);
     scene.add(rim);
 
-    // Architectural drafting turntable plinth & contact shadow
-    const plinthGeo = new THREE.CylinderGeometry(3.15, 3.25, 0.14, 64);
-    const plinthMat = new THREE.MeshStandardMaterial({
-      color: initLight.plinthColor,
+    // Gridded Dark-Slate 3D Printer Build Plate (identical to Gopuram Studio reel screenshots)
+    const bedSize = 5.4;
+    const bedGeo = new THREE.BoxGeometry(bedSize, 0.08, bedSize);
+    const bedMat = new THREE.MeshStandardMaterial({
+      color: initLight.bedColor,
       roughness: 0.9,
-      metalness: 0.02,
+      metalness: 0.04,
     });
-    const plinth = new THREE.Mesh(plinthGeo, plinthMat);
-    plinth.position.y = -0.072;
-    plinth.receiveShadow = true;
-    scene.add(plinth);
+    const bedMesh = new THREE.Mesh(bedGeo, bedMat);
+    bedMesh.position.y = -0.042;
+    bedMesh.receiveShadow = true;
+    scene.add(bedMesh);
 
-    // Subtle engraved millimeter scale ring on the turntable bed
-    const ringGeo = new THREE.RingGeometry(2.65, 2.68, 64);
-    ringGeo.rotateX(-Math.PI / 2);
-    const ringMat = new THREE.MeshBasicMaterial({
-      color: 0x8b7e6d,
+    let gridMesh = new THREE.GridHelper(bedSize, 16, initLight.gridMajor, initLight.gridMinor);
+    gridMesh.position.y = -0.001;
+    scene.add(gridMesh);
+
+    // Wireframe Build Volume Bounding Cage (matching .tmp_1.webp - .tmp_4.webp hairline vertical box)
+    const cageGroup = new THREE.Group();
+    const cageHeight = 5.2;
+    const boxGeo = new THREE.BoxGeometry(bedSize, cageHeight, bedSize);
+    const edgesGeo = new THREE.EdgesGeometry(boxGeo);
+    boxGeo.dispose();
+    const cageMat = new THREE.LineBasicMaterial({
+      color: 0x8b8378,
       transparent: true,
-      opacity: 0.35,
-      polygonOffset: true,
-      polygonOffsetFactor: -1,
-      polygonOffsetUnits: -1,
+      opacity: 0.28,
     });
-    const ring = new THREE.Mesh(ringGeo, ringMat);
-    ring.position.y = 0.001;
-    scene.add(ring);
+    const cageLines = new THREE.LineSegments(edgesGeo, cageMat);
+    cageLines.position.y = cageHeight / 2;
+    cageGroup.add(cageLines);
+    scene.add(cageGroup);
 
     const shadowTex = createRadialShadowTexture();
-    const shadowPlaneGeo = new THREE.PlaneGeometry(5.2, 5.2);
+    const shadowPlaneGeo = new THREE.PlaneGeometry(5.0, 5.0);
     shadowPlaneGeo.rotateX(-Math.PI / 2);
     const shadowPlaneMat = new THREE.MeshBasicMaterial({
       map: shadowTex,
       transparent: true,
       depthWrite: false,
-      opacity: 0.65,
+      opacity: 0.52,
     });
     const shadowPlane = new THREE.Mesh(shadowPlaneGeo, shadowPlaneMat);
-    shadowPlane.position.y = 0.002;
+    shadowPlane.position.y = 0.001;
     scene.add(shadowPlane);
 
     let frameId = 0;
@@ -294,45 +340,15 @@ export function Viewport3D({
         let needsNextFrame = false;
 
         if (eng) {
-          // Smooth camera preset transition with exponential damping
+          // Smooth camera preset transition
           if (eng.targetCamPos && eng.targetLookAt) {
             const lambda = 7.5;
-            camera.position.x = THREE.MathUtils.damp(
-              camera.position.x,
-              eng.targetCamPos.x,
-              lambda,
-              dt
-            );
-            camera.position.y = THREE.MathUtils.damp(
-              camera.position.y,
-              eng.targetCamPos.y,
-              lambda,
-              dt
-            );
-            camera.position.z = THREE.MathUtils.damp(
-              camera.position.z,
-              eng.targetCamPos.z,
-              lambda,
-              dt
-            );
-            controls.target.x = THREE.MathUtils.damp(
-              controls.target.x,
-              eng.targetLookAt.x,
-              lambda,
-              dt
-            );
-            controls.target.y = THREE.MathUtils.damp(
-              controls.target.y,
-              eng.targetLookAt.y,
-              lambda,
-              dt
-            );
-            controls.target.z = THREE.MathUtils.damp(
-              controls.target.z,
-              eng.targetLookAt.z,
-              lambda,
-              dt
-            );
+            camera.position.x = THREE.MathUtils.damp(camera.position.x, eng.targetCamPos.x, lambda, dt);
+            camera.position.y = THREE.MathUtils.damp(camera.position.y, eng.targetCamPos.y, lambda, dt);
+            camera.position.z = THREE.MathUtils.damp(camera.position.z, eng.targetCamPos.z, lambda, dt);
+            controls.target.x = THREE.MathUtils.damp(controls.target.x, eng.targetLookAt.x, lambda, dt);
+            controls.target.y = THREE.MathUtils.damp(controls.target.y, eng.targetLookAt.y, lambda, dt);
+            controls.target.z = THREE.MathUtils.damp(controls.target.z, eng.targetLookAt.z, lambda, dt);
 
             if (
               camera.position.distanceTo(eng.targetCamPos) < 0.02 &&
@@ -347,9 +363,31 @@ export function Viewport3D({
             }
           }
 
-          if (eng.autoRotate && !eng.isSoftwareGl && eng.built) {
-            eng.built.group.rotation.y += dt * 0.28;
+          // Smooth Explode-View layer separation
+          if (Math.abs(eng.explodeCurrent - eng.explodedTarget) > 0.002) {
+            eng.explodeCurrent = THREE.MathUtils.damp(
+              eng.explodeCurrent,
+              eng.explodedTarget,
+              9.0,
+              dt
+            );
             needsNextFrame = true;
+          } else {
+            eng.explodeCurrent = eng.explodedTarget;
+          }
+
+          if (eng.built) {
+            const exp = eng.explodeCurrent;
+            eng.built.group.traverse((obj) => {
+              if (typeof obj.userData?.explodeLayer === 'number') {
+                obj.position.y = obj.userData.explodeLayer * 0.22 * exp;
+              }
+            });
+
+            if (eng.autoRotate && !eng.isSoftwareGl) {
+              eng.built.group.rotation.y += dt * 0.28;
+              needsNextFrame = true;
+            }
           }
         }
 
@@ -405,10 +443,14 @@ export function Viewport3D({
       hemi,
       key,
       rim,
-      plinthMat,
+      bedMat,
+      gridMesh,
+      cageGroup,
       built: null,
       isSoftwareGl,
       autoRotate: false,
+      explodedTarget: 0,
+      explodeCurrent: 0,
       targetCamPos: null,
       targetLookAt: null,
       requestRender,
@@ -436,10 +478,12 @@ export function Viewport3D({
         scene.remove(engineRef.current.built.group);
         disposeBuiltGopuram(engineRef.current.built);
       }
-      plinthGeo.dispose();
-      plinthMat.dispose();
-      ringGeo.dispose();
-      ringMat.dispose();
+      bedGeo.dispose();
+      bedMat.dispose();
+      gridMesh.geometry.dispose();
+      (gridMesh.material as THREE.Material).dispose();
+      edgesGeo.dispose();
+      cageMat.dispose();
       shadowPlaneGeo.dispose();
       shadowPlaneMat.dispose();
       shadowTex.dispose();
@@ -467,6 +511,13 @@ export function Viewport3D({
     eng.built = built;
     eng.scene.add(built.group);
 
+    // Apply current explode progress immediately on rebuild
+    built.group.traverse((obj) => {
+      if (typeof obj.userData?.explodeLayer === 'number') {
+        obj.position.y = obj.userData.explodeLayer * 0.22 * eng.explodeCurrent;
+      }
+    });
+
     const size = new THREE.Vector3();
     const center = new THREE.Vector3();
     built.rawBounds.getSize(size);
@@ -475,6 +526,14 @@ export function Viewport3D({
     eng.modelCenter.copy(center);
     eng.modelMaxDim = Math.max(size.x, size.y, size.z);
     eng.controls.target.set(center.x, center.y * 0.94, center.z);
+
+    // Fit directional shadow frustum dynamically to model bounds for razor-sharp shadows
+    const shadowHalf = Math.max(2.2, eng.modelMaxDim * 0.8);
+    eng.key.shadow.camera.left = -shadowHalf;
+    eng.key.shadow.camera.right = shadowHalf;
+    eng.key.shadow.camera.top = shadowHalf;
+    eng.key.shadow.camera.bottom = -shadowHalf;
+    eng.key.shadow.camera.updateProjectionMatrix();
 
     setLiveMetrics(built.metrics);
     callbacksRef.current.onMetricsUpdate(built.metrics);
@@ -489,7 +548,7 @@ export function Viewport3D({
     if (!eng) return;
     const cfg = LIGHTING_CONFIGS[lighting];
     eng.scene.background = new THREE.Color(cfg.bg);
-    eng.scene.fog = new THREE.FogExp2(cfg.bg, 0.032);
+    eng.scene.fog = new THREE.FogExp2(cfg.bg, 0.025);
     eng.hemi.color.setHex(cfg.sky);
     eng.hemi.groundColor.setHex(cfg.ground);
     eng.hemi.intensity = cfg.hemiIntensity;
@@ -497,11 +556,19 @@ export function Viewport3D({
     eng.key.intensity = cfg.keyIntensity;
     eng.rim.color.setHex(cfg.rimColor);
     eng.rim.intensity = cfg.rimIntensity;
-    eng.plinthMat.color.setHex(cfg.plinthColor);
+    eng.bedMat.color.setHex(cfg.bedColor);
+
+    eng.scene.remove(eng.gridMesh);
+    eng.gridMesh.geometry.dispose();
+    (eng.gridMesh.material as THREE.Material).dispose();
+    eng.gridMesh = new THREE.GridHelper(5.4, 16, cfg.gridMajor, cfg.gridMinor);
+    eng.gridMesh.position.y = -0.001;
+    eng.scene.add(eng.gridMesh);
+
     eng.requestRender();
   }, [lighting]);
 
-  // Update Auto-Rotate
+  // Update Auto-Rotate, Explode Target & Build Volume Visibility
   useEffect(() => {
     const eng = engineRef.current;
     if (!eng) return;
@@ -511,6 +578,23 @@ export function Viewport3D({
     }
   }, [autoRotate]);
 
+  useEffect(() => {
+    const eng = engineRef.current;
+    if (!eng) return;
+    eng.explodedTarget = exploded ? 1 : 0;
+    if (eng.isSoftwareGl) {
+      eng.explodeCurrent = eng.explodedTarget;
+    }
+    eng.requestRender();
+  }, [exploded]);
+
+  useEffect(() => {
+    const eng = engineRef.current;
+    if (!eng) return;
+    eng.cageGroup.visible = showBuildVolume;
+    eng.requestRender();
+  }, [showBuildVolume]);
+
   // Smooth Camera Preset Transitions
   useEffect(() => {
     const eng = engineRef.current;
@@ -518,13 +602,13 @@ export function Viewport3D({
 
     const c = eng.modelCenter;
     const fovRad = THREE.MathUtils.degToRad(eng.camera.fov);
-    const dist = (eng.modelMaxDim / 2 / Math.tan(fovRad / 2)) * 1.55;
+    const dist = (eng.modelMaxDim / 2 / Math.tan(fovRad / 2)) * 1.56;
 
     const lookAt = new THREE.Vector3(c.x, c.y * 0.94, c.z);
-    let camPos = new THREE.Vector3();
+    const camPos = new THREE.Vector3();
 
     if (cameraPreset === 'perspective') {
-      camPos.set(c.x + dist * 0.58, c.y + dist * 0.34, c.z + dist * 0.8);
+      camPos.set(c.x + dist * 0.56, c.y + dist * 0.34, c.z + dist * 0.8);
     } else if (cameraPreset === 'front') {
       camPos.set(c.x, c.y * 0.96, c.z + dist * 1.04);
     } else if (cameraPreset === 'side') {
@@ -546,17 +630,17 @@ export function Viewport3D({
   }, [cameraPreset, cameraPresetTick]);
 
   const isDarkScene = lighting === 'dusk';
+  const isPainted = params.finish === 'polychrome';
 
   return (
     <div className="relative w-full h-full overflow-hidden">
-      {/* Isolated WebGL mount container */}
       <div
         ref={mountRef}
         className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing"
         aria-label="Interactive 3D Gopuram Viewport"
       />
 
-      {/* Top-Left Minimal Spec Readout (no backdrop-blur, unboxed metadata) */}
+      {/* Top-Left Minimal Spec Readout (no backdrop-blur, clean unboxed text) */}
       <div
         className={`pointer-events-none absolute top-4 left-5 z-10 max-w-md px-3.5 py-2.5 rounded-lg border ${
           isDarkScene
@@ -574,7 +658,7 @@ export function Viewport3D({
         >
           <span>Seed #{params.seed}</span>
           <span aria-hidden="true">·</span>
-          <span>{params.tiers} Tiers</span>
+          <span>{params.archetype === 'relief' ? 'Wall Relief' : `${params.tiers} Tiers`}</span>
           {liveMetrics && (
             <>
               <span aria-hidden="true">·</span>
@@ -585,6 +669,106 @@ export function Viewport3D({
               <span>{liveMetrics.estimatedGrams} g PLA</span>
             </>
           )}
+        </div>
+      </div>
+
+      {/* Top-Right Reel Look Switch (Hand-painted vs As printed) & Stage Tools */}
+      <div className="absolute top-4 right-5 z-10 flex flex-wrap items-center justify-end gap-2">
+        <div
+          role="group"
+          aria-label="Preview finish look"
+          className="flex items-center gap-1 p-1 rounded-lg bg-[#F7F3EC] border border-[#1E1916]/12 shadow-xs"
+        >
+          <button
+            type="button"
+            onClick={() => onChangeFinishLook('polychrome')}
+            className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              isPainted
+                ? 'bg-[#3B171E] text-[#F7F3EC]'
+                : 'text-[#1E1916]/70 hover:text-[#1E1916]'
+            }`}
+          >
+            Hand-painted
+          </button>
+          <button
+            type="button"
+            onClick={() => onChangeFinishLook(lastPrintedFinishRef.current)}
+            className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              !isPainted
+                ? 'bg-[#3B171E] text-[#F7F3EC]'
+                : 'text-[#1E1916]/70 hover:text-[#1E1916]'
+            }`}
+          >
+            As printed
+          </button>
+        </div>
+
+        <div className="flex items-center gap-1 p-1 rounded-lg bg-[#F7F3EC] border border-[#1E1916]/12 shadow-xs">
+          <button
+            type="button"
+            onClick={onResetCamera}
+            title="Reset 3/4 view"
+            aria-label="Reset 3/4 view"
+            className="p-1.5 rounded-md text-[#1E1916]/75 hover:bg-[#EFE9DF] hover:text-[#1E1916] cursor-pointer"
+          >
+            <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={onToggleExploded}
+            title="Explode architectural layers"
+            aria-label="Explode architectural layers"
+            aria-pressed={exploded}
+            className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+              exploded
+                ? 'bg-[#B8432A] text-[#F7F3EC]'
+                : 'text-[#1E1916]/75 hover:bg-[#EFE9DF] hover:text-[#1E1916]'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={onToggleAutoRotate}
+            title="Toggle turntable rotation"
+            aria-label="Toggle turntable rotation"
+            aria-pressed={autoRotate}
+            className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+              autoRotate
+                ? 'bg-[#3B171E] text-[#F7F3EC]'
+                : 'text-[#1E1916]/75 hover:bg-[#EFE9DF] hover:text-[#1E1916]'
+            }`}
+          >
+            <RotateCw className="w-3.5 h-3.5" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={onToggleWireframe}
+            title="Toggle mesh wireframe"
+            aria-label="Toggle mesh wireframe"
+            aria-pressed={wireframe}
+            className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+              wireframe
+                ? 'bg-[#3B171E] text-[#F7F3EC]'
+                : 'text-[#1E1916]/75 hover:bg-[#EFE9DF] hover:text-[#1E1916]'
+            }`}
+          >
+            <Grid2X2 className="w-3.5 h-3.5" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={onToggleBuildVolume}
+            title="Toggle print volume cage"
+            aria-label="Toggle print volume cage"
+            aria-pressed={showBuildVolume}
+            className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+              showBuildVolume
+                ? 'bg-[#3B171E] text-[#F7F3EC]'
+                : 'text-[#1E1916]/75 hover:bg-[#EFE9DF] hover:text-[#1E1916]'
+            }`}
+          >
+            <Box className="w-3.5 h-3.5" aria-hidden="true" />
+          </button>
         </div>
       </div>
 

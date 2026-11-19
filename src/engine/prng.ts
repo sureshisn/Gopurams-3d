@@ -42,9 +42,9 @@ function range(rng: () => number, min: number, max: number): number {
 const ARCHETYPES: readonly GopuramArchetype[] = [
   'gopuram',
   'gopuram',
-  'gopuram',
   'vimana',
   'complex',
+  'relief',
 ];
 
 const STYLES: readonly GopuramStyle[] = [
@@ -55,9 +55,10 @@ const STYLES: readonly GopuramStyle[] = [
 ];
 
 const FINISHES: readonly GopuramFinish[] = [
-  'granite',
-  'ivory',
   'polychrome',
+  'polychrome',
+  'ivory',
+  'granite',
   'sandstone',
   'limestone',
   'basalt',
@@ -65,8 +66,8 @@ const FINISHES: readonly GopuramFinish[] = [
 
 const PORTALS: readonly PortalStyle[] = [
   'arched',
+  'cusped',
   'corbelled',
-  'mandapa',
   'stepped',
 ];
 
@@ -97,34 +98,42 @@ export function generateGopuramParamsFromSeed(
   if (style === 'chola') {
     tiers = Math.floor(range(rng, 4, 7.9));
     baseWidthRatio = archetype === 'vimana' ? range(rng, 1.0, 1.12) : range(rng, 1.48, 1.78);
-    heightMultiplier = range(rng, 0.95, 1.22);
+    heightMultiplier = range(rng, 0.95, 1.2);
     taperExponent = range(rng, 0.85, 1.12);
     taperCurve = rng() > 0.35 ? 'linear' : 'stepped';
   } else if (style === 'pandya') {
     tiers = Math.floor(range(rng, 5, 9.9));
-    baseWidthRatio = archetype === 'vimana' ? range(rng, 1.0, 1.1) : range(rng, 1.55, 1.9);
-    heightMultiplier = range(rng, 1.05, 1.32);
+    baseWidthRatio = archetype === 'vimana' ? range(rng, 1.0, 1.1) : range(rng, 1.55, 1.88);
+    heightMultiplier = range(rng, 1.05, 1.3);
     taperExponent = range(rng, 0.72, 0.98);
     taperCurve = rng() > 0.3 ? 'concave' : 'linear';
   } else if (style === 'vijayanagara') {
     tiers = Math.floor(range(rng, 4, 8.9));
-    baseWidthRatio = archetype === 'vimana' ? range(rng, 1.02, 1.15) : range(rng, 1.68, 2.08);
-    heightMultiplier = range(rng, 0.9, 1.18);
+    baseWidthRatio = archetype === 'vimana' ? range(rng, 1.02, 1.15) : range(rng, 1.65, 2.02);
+    heightMultiplier = range(rng, 0.92, 1.18);
     taperExponent = range(rng, 0.92, 1.2);
     taperCurve = rng() > 0.4 ? 'stepped' : 'convex';
   } else {
-    // nayak - soaring tall multi-tiered silhouette
     tiers = Math.floor(range(rng, 7, 11.4));
-    baseWidthRatio = archetype === 'vimana' ? range(rng, 1.0, 1.08) : range(rng, 1.65, 2.15);
-    heightMultiplier = range(rng, 1.15, 1.42);
+    baseWidthRatio = archetype === 'vimana' ? range(rng, 1.0, 1.08) : range(rng, 1.62, 2.05);
+    heightMultiplier = range(rng, 1.12, 1.38);
     taperExponent = range(rng, 0.68, 0.94);
     taperCurve = 'concave';
   }
 
-  const portalStyle = overrides?.portalStyle ?? pick(rng, PORTALS);
+  if (archetype === 'vimana') {
+    tiers = Math.min(tiers, 5);
+  } else if (archetype === 'relief') {
+    tiers = Math.max(3, Math.min(5, tiers));
+    baseWidthRatio = range(rng, 1.25, 1.55);
+  }
+
+  const portalStyle =
+    overrides?.portalStyle ??
+    (archetype === 'vimana' || archetype === 'relief' ? 'cusped' : pick(rng, PORTALS));
   const portalScale = range(rng, 0.25, 0.38);
   const shrineDensity = Math.floor(range(rng, 2, 5.8));
-  const corniceProjection = range(rng, 0.055, 0.115);
+  const corniceProjection = range(rng, 0.055, 0.11);
 
   const kalasamOptions = archetype === 'vimana' ? [1] : [3, 5, 7, 9];
   const kalasamCount =
@@ -134,11 +143,11 @@ export function generateGopuramParamsFromSeed(
       : kalasamOptions[Math.min(kalasamOptions.length - 1, Math.floor(rng() * kalasamOptions.length))]);
 
   const hasCourtyard =
-    overrides?.hasCourtyard ?? (archetype === 'complex' ? true : rng() > 0.68);
+    overrides?.hasCourtyard ?? (archetype === 'complex' ? true : rng() > 0.72);
   const hasMandapam =
-    overrides?.hasMandapam ?? (archetype === 'complex' ? true : rng() > 0.72);
+    overrides?.hasMandapam ?? (archetype === 'complex' ? true : rng() > 0.7);
   const hasFlankingShrines =
-    overrides?.hasFlankingShrines ?? (archetype === 'complex' ? rng() > 0.25 : rng() > 0.84);
+    overrides?.hasFlankingShrines ?? (archetype === 'complex' ? rng() > 0.2 : rng() > 0.85);
 
   return {
     seed,
@@ -158,7 +167,7 @@ export function generateGopuramParamsFromSeed(
     hasCourtyard,
     hasMandapam,
     hasFlankingShrines,
-    kuduDetail: rng() > 0.15,
+    kuduDetail: rng() > 0.12,
     targetHeightMm: 140,
     ...overrides,
   };
@@ -173,10 +182,14 @@ const STYLE_LABELS: Record<GopuramStyle, string> = {
 
 const ARCHETYPE_LABELS: Record<GopuramArchetype, string> = {
   gopuram: 'Gopuram',
-  vimana: 'Vimana',
+  vimana: 'Mandir Vimana',
   complex: 'Temple Complex',
+  relief: 'Wall Relief',
 };
 
 export function formatGopuramTitle(params: GopuramParams): string {
+  if (params.customName && params.customName.trim().length > 0) {
+    return params.customName.trim();
+  }
   return `${STYLE_LABELS[params.style]} ${ARCHETYPE_LABELS[params.archetype]}`;
 }

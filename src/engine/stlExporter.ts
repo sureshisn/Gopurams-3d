@@ -2,13 +2,25 @@ import * as THREE from 'three';
 
 /**
  * Exports a Three.js Group to a print-ready Binary STL file (Z-up, millimeters,
- * resting flush on the print bed Z = 0).
+ * resting flush on the print bed Z = 0). Temporarily resets any explode-view offsets
+ * so exported geometry is always solid and grounded.
  */
 export function exportGroupToBinarySTL(
   group: THREE.Group,
   targetHeightMm: number,
   filename: string
 ) {
+  // Temporarily restore explode layers to y = 0 so STL is always solid & grounded
+  const savedLayerY: { obj: THREE.Object3D; y: number }[] = [];
+  const savedRotY = group.rotation.y;
+  group.rotation.y = 0;
+  group.traverse((obj) => {
+    if (typeof obj.userData?.explodeLayer === 'number' && obj.position.y !== 0) {
+      savedLayerY.push({ obj, y: obj.position.y });
+      obj.position.y = 0;
+    }
+  });
+
   group.updateMatrixWorld(true);
   const bounds = new THREE.Box3().setFromObject(group);
   const size = new THREE.Vector3();
@@ -19,7 +31,6 @@ export function exportGroupToBinarySTL(
   const scale = targetHeightMm / Math.max(0.0001, size.y);
   const minY = bounds.min.y;
 
-  // Collect all triangles in world space
   let totalTriangles = 0;
   const meshes: THREE.Mesh[] = [];
   group.traverse((obj) => {
@@ -36,7 +47,6 @@ export function exportGroupToBinarySTL(
   const buffer = new ArrayBuffer(bufferLength);
   const view = new DataView(buffer);
 
-  // 80-byte ASCII header
   const headerText = `Gopuram Studio Binary STL (${Math.round(targetHeightMm)}mm)`;
   for (let i = 0; i < 80; i++) {
     view.setUint8(i, i < headerText.length ? headerText.charCodeAt(i) : 32);
@@ -77,27 +87,22 @@ export function exportGroupToBinarySTL(
       ab.subVectors(vA, vB);
       cb.cross(ab).normalize();
 
-      // Normal
       view.setFloat32(offset, cb.x, true);
       view.setFloat32(offset + 4, cb.y, true);
       view.setFloat32(offset + 8, cb.z, true);
 
-      // Vertex A
       view.setFloat32(offset + 12, vA.x, true);
       view.setFloat32(offset + 16, vA.y, true);
       view.setFloat32(offset + 20, vA.z, true);
 
-      // Vertex B
       view.setFloat32(offset + 24, vB.x, true);
       view.setFloat32(offset + 28, vB.y, true);
       view.setFloat32(offset + 32, vB.z, true);
 
-      // Vertex C
       view.setFloat32(offset + 36, vC.x, true);
       view.setFloat32(offset + 40, vC.y, true);
       view.setFloat32(offset + 44, vC.z, true);
 
-      // Attribute byte count
       view.setUint16(offset + 48, 0, true);
       offset += 50;
     };
@@ -112,6 +117,13 @@ export function exportGroupToBinarySTL(
       }
     }
   }
+
+  // Restore viewport visual state
+  group.rotation.y = savedRotY;
+  for (const item of savedLayerY) {
+    item.obj.position.y = item.y;
+  }
+  group.updateMatrixWorld(true);
 
   const blob = new Blob([buffer], { type: 'application/octet-stream' });
   const url = URL.createObjectURL(blob);

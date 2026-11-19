@@ -17,31 +17,31 @@ const ANATOMY_ITEMS = [
     index: '02',
     term: 'Aditala & Vaasal (Gateway Storey)',
     detail:
-      'Monumental ground storey pierced by an arched, corbelled, or stepped central passageway, flanked by carved Devakoshta niches and rhythmic vertical pilasters.',
+      'Monumental ground storey pierced by an arched, cusped, or corbelled central passageway, flanked by pointed Devakoshta niches and rhythmic blue pilasters.',
   },
   {
     index: '03',
     term: 'Talas (Diminishing Storeys)',
     detail:
-      'Stacked tapering levels featuring corner square Kuta pavilions, central elongated Shala vaults, and alternating Panjara miniature shrines.',
+      'Stacked tapering levels featuring corner square Kuta pavilions, central elongated Shala vaults, alternating Panjara miniature shrines, and a central spine of Kudu arches.',
   },
   {
     index: '04',
     term: 'Kapota & Kudu (Print-Safe Cornices)',
     detail:
-      'Flared horizontal cornice overhangs angled at 45° with horseshoe Kudu dormer reliefs, engineered to print cleanly without support material.',
+      'Flared horizontal cornice overhangs angled strictly ≤ 42° with horseshoe Kudu dormer reliefs, engineered to print cleanly without support material.',
   },
   {
     index: '05',
     term: 'Griva & Sala-Shikhara (Vaulted Crest)',
     detail:
-      'A recessed transition neck supporting either a barrel-vaulted Sala-Shikhara roof with gable Mahanasika arches or an octagonal Vimana bell dome.',
+      'A recessed transition neck supporting either a barrel-vaulted Sala-Shikhara roof with horn finials and gable arches, a Mandir dome, or a framed Wall Relief plaque.',
   },
   {
     index: '06',
     term: 'Kalasams (Sacred Finials)',
     detail:
-      'Lathe-turned ceremonial pot finials arranged along the top ridge spine, proportioned with thickened tips for crisp FDM or resin reproduction.',
+      'Lathe-turned ceremonial pot finials embedded cleanly along the top ridge spine with thickened tips for crisp FDM or resin reproduction.',
   },
 ];
 
@@ -51,22 +51,23 @@ const CURATED_PRESETS: {
   params: GopuramParams;
 }[] = [
   {
-    title: 'Brihadeeswarar Chola Gateway',
-    subtitle: '7 Tiers · Straight Taper · Granite Stone',
-    params: generateGopuramParamsFromSeed(1010, {
-      archetype: 'gopuram',
-      style: 'chola',
-      finish: 'granite',
-      tiers: 7,
-      portalStyle: 'corbelled',
-      kalasamCount: 5,
-      hasCourtyard: false,
-      hasMandapam: false,
+    title: 'Temple Complex with Courtyard & Mandapam',
+    subtitle: '9 Tiers · Hand-Painted Polychrome · Corner Shrines',
+    params: generateGopuramParamsFromSeed(8841, {
+      archetype: 'complex',
+      style: 'pandya',
+      finish: 'polychrome',
+      tiers: 9,
+      portalStyle: 'arched',
+      kalasamCount: 7,
+      hasCourtyard: true,
+      hasMandapam: true,
+      hasFlankingShrines: true,
     }),
   },
   {
-    title: 'Madurai Polychrome Gopuram',
-    subtitle: '9 Tiers · Concave Nayak · Polychrome Stucco',
+    title: 'Polychrome Rajagopuram Tower',
+    subtitle: '9 Tiers · Nayak Concave Taper · 7 Kalasams',
     params: generateGopuramParamsFromSeed(7007, {
       archetype: 'gopuram',
       style: 'nayak',
@@ -75,36 +76,35 @@ const CURATED_PRESETS: {
       portalStyle: 'arched',
       kalasamCount: 7,
       hasCourtyard: false,
-      hasMandapam: true,
+      hasMandapam: false,
     }),
   },
   {
-    title: 'Ivory Print Miniature Vimana',
-    subtitle: '5 Tiers · Square Dome · Ivory PLA',
+    title: 'Sanctum Mandir Vimana',
+    subtitle: '5 Tiers · Cusped Torana Arch · Cupola Dome',
     params: generateGopuramParamsFromSeed(3312, {
       archetype: 'vimana',
       style: 'chola',
-      finish: 'ivory',
-      tiers: 5,
-      portalStyle: 'arched',
+      finish: 'polychrome',
+      tiers: 4,
+      portalStyle: 'cusped',
       kalasamCount: 1,
       hasCourtyard: false,
       hasMandapam: false,
     }),
   },
   {
-    title: 'Rameswaram Prakaram Complex',
-    subtitle: '6 Tiers · Courtyard & Porch · Terracotta',
-    params: generateGopuramParamsFromSeed(8841, {
-      archetype: 'complex',
+    title: 'Framed Temple Wall Relief Plaque',
+    subtitle: '3 Sanctums · Baluster Gallery · Medallion Border',
+    params: generateGopuramParamsFromSeed(5204, {
+      archetype: 'relief',
       style: 'vijayanagara',
-      finish: 'sandstone',
-      tiers: 6,
-      portalStyle: 'stepped',
-      kalasamCount: 5,
-      hasCourtyard: true,
-      hasMandapam: true,
-      hasFlankingShrines: true,
+      finish: 'polychrome',
+      tiers: 3,
+      portalStyle: 'cusped',
+      kalasamCount: 1,
+      hasCourtyard: false,
+      hasMandapam: false,
     }),
   },
 ];
@@ -115,14 +115,13 @@ export function ArchitectureGuide({ onLoadPreset }: ArchitectureGuideProps) {
       <div className="max-w-5xl mx-auto space-y-12">
         <section className="max-w-2xl">
           <h1 className="font-display text-3xl md:text-4xl font-semibold text-[#3B171E] tracking-tight">
-            Dravidian Gopuram Anatomy & Print Engineering
+            Dravidian Gopuram Anatomy &amp; Print Engineering
           </h1>
           <p className="mt-3 text-base leading-relaxed text-[#1E1916]/75">
-            Every seed synthesizes a complete multi-tiered South Indian temple tower using traditional Dravidian proportions—engineered with flat bed contact and 45° self-supporting cornices for reliable desktop 3D printing.
+            Every seed synthesizes a complete multi-tiered South Indian temple tower, sanctum mandir, courtyard complex, or wall relief—engineered with flat bed contact and ≤ 42° self-supporting cornices.
           </p>
         </section>
 
-        {/* Architectural Elements */}
         <section>
           <h2 className="font-display text-xl font-semibold text-[#1E1916] pb-3 border-b border-[#1E1916]/12">
             Structural Hierarchy
@@ -147,10 +146,9 @@ export function ArchitectureGuide({ onLoadPreset }: ArchitectureGuideProps) {
           </div>
         </section>
 
-        {/* Curated Historical Archetypes */}
         <section>
           <h2 className="font-display text-xl font-semibold text-[#1E1916] pb-3 border-b border-[#1E1916]/12">
-            Reference Archetypes
+            Showcase Archetypes
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-6">
             {CURATED_PRESETS.map((preset) => (
@@ -174,31 +172,6 @@ export function ArchitectureGuide({ onLoadPreset }: ArchitectureGuideProps) {
                 />
               </button>
             ))}
-          </div>
-        </section>
-
-        {/* Recommended Print Settings */}
-        <section className="p-6 bg-[#EFE9DF]/70 border border-[#1E1916]/10 rounded-xl">
-          <h2 className="font-display text-lg font-semibold text-[#3B171E]">
-            Recommended Slicer Profile
-          </h2>
-          <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-            <div>
-              <div className="text-xs text-[#1E1916]/60">Layer Height</div>
-              <div className="mt-0.5 font-mono-tabular font-medium">0.16 – 0.20 mm</div>
-            </div>
-            <div>
-              <div className="text-xs text-[#1E1916]/60">Supports</div>
-              <div className="mt-0.5 font-mono-tabular font-medium">None Required</div>
-            </div>
-            <div>
-              <div className="text-xs text-[#1E1916]/60">Walls & Infill</div>
-              <div className="mt-0.5 font-mono-tabular font-medium">2–3 Walls · 15% Gyroid</div>
-            </div>
-            <div>
-              <div className="text-xs text-[#1E1916]/60">Material</div>
-              <div className="mt-0.5 font-mono-tabular font-medium">Matte Ivory / Marble PLA</div>
-            </div>
           </div>
         </section>
       </div>
